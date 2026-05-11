@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import ResultPanel from "@/components/ResultPanel";
 import { analyzeInputQuality, getCompletenessLabel } from "@/lib/analyzeInputQuality";
+import { appVersion } from "@/lib/constants";
+import {
+  addTrialHistoryItem,
+  readLatestForm,
+  saveLatestForm,
+  updateTrialHistoryResult,
+} from "@/lib/trialHistory";
+import { recordTrialEvent } from "@/lib/trialEvents";
 import type { CareerFormData, GenerateResult, InputQualityAnalysis } from "@/lib/types";
 
 type FieldConfig = {
@@ -71,8 +80,6 @@ const loadingMessages = [
   "正在生成简历表达...",
   "正在准备面试追问...",
 ];
-
-const savedFormStorageKey = "career-material-latest-form";
 
 const fieldGroups: FieldGroup[] = [
   {
@@ -168,11 +175,22 @@ export default function FormPage() {
   const [qualityAnalysis, setQualityAnalysis] = useState<InputQualityAnalysis | null>(null);
   const [qualityWarning, setQualityWarning] = useState("");
   const [regenerateError, setRegenerateError] = useState("");
+  const [currentHistoryId, setCurrentHistoryId] = useState("");
+  const [hasStartedForm, setHasStartedForm] = useState(false);
 
   const loadingText = useMemo(
     () => loadingMessages[loadingIndex % loadingMessages.length],
     [loadingIndex],
   );
+
+  useEffect(() => {
+    if (window.location.search.includes("fromHistory=1")) {
+      const latestForm = readLatestForm();
+      if (latestForm) {
+        setForm(latestForm);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
@@ -188,6 +206,11 @@ export default function FormPage() {
   }, [isLoading]);
 
   function updateField(name: keyof CareerFormData, value: string) {
+    if (!hasStartedForm) {
+      recordTrialEvent({ eventName: "form_started" });
+      setHasStartedForm(true);
+    }
+
     setForm((current) => ({ ...current, [name]: value }));
     setFieldErrors((current) => {
       if (!current[name]) return current;
@@ -221,6 +244,11 @@ export default function FormPage() {
     setError("");
     setQualityWarning("");
     setRegenerateError("");
+    recordTrialEvent({
+      eventName: "example_filled",
+      targetRole: sampleForm.targetRole,
+      projectType: sampleForm.projectType,
+    });
     setResult(null);
   }
 
@@ -229,6 +257,12 @@ export default function FormPage() {
 
     const currentQuality = analyzeInputQuality(form);
     setQualityAnalysis(currentQuality);
+    recordTrialEvent({
+      eventName: "generate_clicked",
+      targetRole: form.targetRole,
+      projectType: form.projectType,
+      completenessLevel: currentQuality.completenessLevel,
+    });
     setQualityWarning(
       currentQuality.completenessLevel === "low"
         ? "当前输入完整度较低，生成结果可能偏泛。你可以继续生成，也可以先补充更多细节。"
@@ -267,7 +301,26 @@ export default function FormPage() {
 
       const data = (await response.json()) as GenerateResult;
       setResult(data);
+      const historyItem = addTrialHistoryItem({
+        formData: form,
+        result: data,
+        completenessLevel: currentQuality.completenessLevel,
+      });
+      setCurrentHistoryId(historyItem.id);
+      recordTrialEvent({
+        eventName: "generate_success",
+        targetRole: form.targetRole,
+        projectType: form.projectType,
+        source: data.source || "mock",
+        completenessLevel: currentQuality.completenessLevel,
+      });
     } catch (currentError) {
+      recordTrialEvent({
+        eventName: "generate_failed",
+        targetRole: form.targetRole,
+        projectType: form.projectType,
+        completenessLevel: currentQuality.completenessLevel,
+      });
       setError(currentError instanceof Error ? currentError.message : "生成失败，请稍后重试。");
     } finally {
       setIsLoading(false);
@@ -284,6 +337,12 @@ export default function FormPage() {
 
     const currentQuality = analyzeInputQuality(latestForm);
     setQualityAnalysis(currentQuality);
+    recordTrialEvent({
+      eventName: "regenerate_clicked",
+      targetRole: latestForm.targetRole,
+      projectType: latestForm.projectType,
+      completenessLevel: currentQuality.completenessLevel,
+    });
     setQualityWarning(
       currentQuality.completenessLevel === "low"
         ? "当前输入完整度较低，重新生成结果可能仍然偏泛。建议补充细节后再试。"
@@ -312,7 +371,26 @@ export default function FormPage() {
 
       const data = (await response.json()) as GenerateResult;
       setResult(data);
+      const historyItem = addTrialHistoryItem({
+        formData: latestForm,
+        result: data,
+        completenessLevel: currentQuality.completenessLevel,
+      });
+      setCurrentHistoryId(historyItem.id);
+      recordTrialEvent({
+        eventName: "generate_success",
+        targetRole: latestForm.targetRole,
+        projectType: latestForm.projectType,
+        source: data.source || "mock",
+        completenessLevel: currentQuality.completenessLevel,
+      });
     } catch {
+      recordTrialEvent({
+        eventName: "generate_failed",
+        targetRole: latestForm.targetRole,
+        projectType: latestForm.projectType,
+        completenessLevel: currentQuality.completenessLevel,
+      });
       setRegenerateError("重新生成失败，请稍后重试。");
     } finally {
       setIsLoading(false);
@@ -329,9 +407,14 @@ export default function FormPage() {
             </a>
             <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64748B]">
-                  Career Material Assistant
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64748B]">
+                    Career Material Assistant
+                  </p>
+                  <span className="rounded-full bg-[#E8F8F3] px-3 py-1 text-xs font-bold text-[#16876F]">
+                    {appVersion} 试用版
+                  </span>
+                </div>
                 <h1 className="mt-2 text-3xl font-bold text-[#1F2933]">填写项目信息</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B]">
                   不需要写得很完美，先把真实信息填进去。系统会帮你整理成简历表达、面试追问和修改建议。
@@ -346,6 +429,12 @@ export default function FormPage() {
               >
                 填入示例项目
               </button>
+              <Link
+                href="/history"
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F]"
+              >
+                查看历史记录
+              </Link>
             </div>
           </div>
 
@@ -400,7 +489,7 @@ export default function FormPage() {
             </div>
 
             <p className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs leading-5 text-[#64748B]">
-              请勿填写身份证号、手机号、银行卡号等敏感信息。生成内容仅供参考，最终简历请以真实经历为准。
+              本工具仍在测试阶段，生成内容仅供简历初稿参考，请根据真实经历修改后使用。请勿填写身份证号、手机号、银行卡号等敏感信息。
             </p>
           </form>
 
@@ -410,26 +499,19 @@ export default function FormPage() {
             onRegenerate={handleRegenerate}
             isRegenerating={isLoading}
             regenerateError={regenerateError}
+            formData={form}
+            historyItemId={currentHistoryId}
+            onResultChange={(nextResult) => {
+              setResult(nextResult);
+              if (currentHistoryId) {
+                updateTrialHistoryResult(currentHistoryId, nextResult);
+              }
+            }}
           />
         </div>
       </div>
     </main>
   );
-}
-
-function saveLatestForm(currentForm: CareerFormData) {
-  window.localStorage.setItem(savedFormStorageKey, JSON.stringify(currentForm));
-}
-
-function readLatestForm() {
-  const storedForm = window.localStorage.getItem(savedFormStorageKey);
-  if (!storedForm) return null;
-
-  try {
-    return JSON.parse(storedForm) as CareerFormData;
-  } catch {
-    return null;
-  }
 }
 
 function FormSection({

@@ -14,6 +14,7 @@ export type CareerFormData = {
 };
 
 export type GenerateResult = {
+  recommendedResumeVersion?: string[];
   conservativeVersion: string[];
   enhancedVersion: string[];
   interviewQuestions: Array<{
@@ -40,4 +41,34 @@ export type InputQualityAnalysis = {
   completenessLevel: "high" | "medium" | "low";
   issues: string[];
   suggestions: string[];
+};
+
+export type TrialHistoryItem = {
+  id: string;
+  formData: CareerFormData;
+  result: GenerateResult;
+  createdAt: string;
+  source: "ai" | "mock";
+  completenessLevel: InputQualityAnalysis["completenessLevel"];
+};
+
+export type TrialEventName =
+  | "form_started"
+  | "example_filled"
+  | "generate_clicked"
+  | "generate_success"
+  | "generate_failed"
+  | "copy_all_clicked"
+  | "copy_section_clicked"
+  | "regenerate_clicked"
+  | "feedback_submitted";
+
+export type TrialEvent = {
+  eventName: TrialEventName;
+  timestamp: string;
+  sessionId: string;
+  targetRole?: string;
+  projectType?: string;
+  source?: "ai" | "mock";
+  completenessLevel?: InputQualityAnalysis["completenessLevel"];
 };

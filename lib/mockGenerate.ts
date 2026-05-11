@@ -4,6 +4,13 @@ export function generateMockResult(data: CareerFormData, fallbackReason?: string
   return {
     source: "mock",
     fallbackReason,
+    recommendedResumeVersion: [
+      `${data.projectName || "项目"}：围绕${data.projectBackground || "实际业务需求"}，负责${
+        data.responsibilities || "需求梳理、功能实现与资料整理"
+      }，使用${data.tools || "相关工具和方法"}推进核心任务，并针对${
+        data.challenges || "项目推进中的问题"
+      }进行优化，最终完成${data.results || "可复用的项目成果"}。`,
+    ],
     conservativeVersion: [
       `在「${data.projectName || "项目"}」中，围绕${
         data.projectBackground || "业务需求"

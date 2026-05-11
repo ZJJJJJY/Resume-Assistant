@@ -45,6 +45,12 @@ export function normalizeGenerateResult(value: unknown, formData: CareerFormData
   ].slice(0, 5);
 
   return {
+    recommendedResumeVersion:
+      cleanStringArray(raw.recommendedResumeVersion).length > 0
+        ? cleanStringArray(raw.recommendedResumeVersion)
+        : cleanStringArray(raw.enhancedVersion).length > 0
+          ? cleanStringArray(raw.enhancedVersion)
+          : fallback.recommendedResumeVersion || fallback.enhancedVersion,
     conservativeVersion:
       cleanStringArray(raw.conservativeVersion).length > 0
         ? cleanStringArray(raw.conservativeVersion)

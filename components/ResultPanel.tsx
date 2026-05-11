@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { analyzeInputQuality, getCompletenessLabel } from "@/lib/analyzeInputQuality";
+import { appVersion } from "@/lib/constants";
+import { recordTrialEvent } from "@/lib/trialEvents";
 import type {
   CareerFormData,
   FeedbackRating,
@@ -16,6 +18,9 @@ type ResultPanelProps = {
   onRegenerate?: () => Promise<void> | void;
   isRegenerating?: boolean;
   regenerateError?: string;
+  formData?: CareerFormData;
+  historyItemId?: string;
+  onResultChange?: (result: GenerateResult) => void;
 };
 
 const feedbackOptions: FeedbackRating[] = ["有帮助", "一般", "没帮助"];
@@ -28,8 +33,11 @@ export default function ResultPanel({
   onRegenerate,
   isRegenerating = false,
   regenerateError = "",
+  formData,
+  onResultChange,
 }: ResultPanelProps) {
   const [copied, setCopied] = useState(false);
+  const [copiedSection, setCopiedSection] = useState("");
   const [feedbackCopied, setFeedbackCopied] = useState(false);
   const [rating, setRating] = useState<FeedbackRating | "">("");
   const [comment, setComment] = useState("");
@@ -37,13 +45,24 @@ export default function ResultPanel({
   const [feedbackError, setFeedbackError] = useState("");
   const [latestForm, setLatestForm] = useState<CareerFormData | null>(null);
   const [fallbackQuality, setFallbackQuality] = useState<InputQualityAnalysis | null>(null);
+  const [hasCopiedAll, setHasCopiedAll] = useState(false);
+  const [hasRegenerated, setHasRegenerated] = useState(false);
 
   const visibleQuality = qualityAnalysis || fallbackQuality;
+  const activeForm = formData || latestForm;
+  const recommendedVersion = result?.recommendedResumeVersion?.length
+    ? result.recommendedResumeVersion
+    : result?.enhancedVersion || [];
 
   const copyText = useMemo(() => {
     if (!result) return "";
 
     return [
+      "推荐放入简历的项目经历",
+      ...(result.recommendedResumeVersion || result.enhancedVersion).map(
+        (item, index) => `${index + 1}. ${item}`,
+      ),
+      "",
       "保守版项目经历",
       ...result.conservativeVersion.map((item, index) => `${index + 1}. ${item}`),
       "",
@@ -65,6 +84,7 @@ export default function ResultPanel({
 
   useEffect(() => {
     setCopied(false);
+    setCopiedSection("");
     setFeedbackCopied(false);
     setRating("");
     setComment("");
@@ -81,7 +101,28 @@ export default function ResultPanel({
 
     await navigator.clipboard.writeText(copyText);
     setCopied(true);
+    setHasCopiedAll(true);
+    recordTrialEvent({
+      eventName: "copy_all_clicked",
+      targetRole: activeForm?.targetRole,
+      projectType: activeForm?.projectType,
+      source: result?.source,
+      completenessLevel: visibleQuality?.completenessLevel,
+    });
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  async function handleCopySection(title: string, items: string[]) {
+    await navigator.clipboard.writeText([title, ...items.map((item, index) => `${index + 1}. ${item}`)].join("\n"));
+    setCopiedSection(title);
+    recordTrialEvent({
+      eventName: "copy_section_clicked",
+      targetRole: activeForm?.targetRole,
+      projectType: activeForm?.projectType,
+      source: result?.source,
+      completenessLevel: visibleQuality?.completenessLevel,
+    });
+    window.setTimeout(() => setCopiedSection(""), 1600);
   }
 
   async function handleFeedbackSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -91,8 +132,8 @@ export default function ResultPanel({
       rating: rating || "一般",
       comment: comment.trim(),
       createdAt: new Date().toISOString(),
-      targetRole: latestForm?.targetRole,
-      projectName: latestForm?.projectName,
+      targetRole: activeForm?.targetRole,
+      projectName: activeForm?.projectName,
     };
     const existingFeedback = window.localStorage.getItem(feedbackStorageKey);
     const feedbackList = existingFeedback
@@ -105,6 +146,13 @@ export default function ResultPanel({
     );
     setFeedbackSubmitted(true);
     setFeedbackError("");
+    recordTrialEvent({
+      eventName: "feedback_submitted",
+      targetRole: activeForm?.targetRole,
+      projectType: activeForm?.projectType,
+      source: result?.source,
+      completenessLevel: visibleQuality?.completenessLevel,
+    });
 
     try {
       const response = await fetch("/api/feedback", {
@@ -124,16 +172,32 @@ export default function ResultPanel({
   async function handleCopyFeedbackPackage() {
     const packageText = [
       "求职材料生成反馈",
+      `当前版本号：${appVersion}`,
+      `项目名称：${activeForm?.projectName || "未填写"}`,
+      `目标岗位：${activeForm?.targetRole || "未填写"}`,
+      `项目类型：${activeForm?.projectType || "未填写"}`,
+      `信息完整度：${visibleQuality?.completenessLevel || "未知"}`,
+      `生成来源：${result?.source || "未知"}`,
+      `是否点击过复制全部：${hasCopiedAll ? "是" : "否"}`,
+      `是否重新生成过：${hasRegenerated ? "是" : "否"}`,
       `用户选择：${rating || "未选择"}`,
       `用户文字反馈：${comment.trim() || "未填写"}`,
-      `目标岗位：${latestForm?.targetRole || "未填写"}`,
-      `项目名称：${latestForm?.projectName || "未填写"}`,
       `当前时间：${new Date().toLocaleString("zh-CN")}`,
     ].join("\n");
 
     await navigator.clipboard.writeText(packageText);
     setFeedbackCopied(true);
     window.setTimeout(() => setFeedbackCopied(false), 1600);
+  }
+
+  function handleResultPatch(patch: Partial<GenerateResult>) {
+    if (!result) return;
+    onResultChange?.({ ...result, ...patch });
+  }
+
+  async function handleRegenerateClick() {
+    setHasRegenerated(true);
+    await onRegenerate?.();
   }
 
   if (!result) {
@@ -159,8 +223,8 @@ export default function ResultPanel({
 
   return (
     <aside className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-[0_16px_46px_rgba(31,41,51,0.07)]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(220px,1fr)_auto] xl:items-start">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64748B]">
             Report
           </p>
@@ -179,25 +243,25 @@ export default function ResultPanel({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-wrap gap-2 xl:justify-end">
           <a
             href="#project-experience"
-            className="inline-flex h-10 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F]"
+            className="inline-flex h-10 flex-1 min-w-[104px] items-center justify-center whitespace-nowrap rounded-2xl border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F] sm:flex-none"
           >
             返回修改
           </a>
           <button
             type="button"
             onClick={handleCopy}
-            className="h-10 rounded-2xl bg-[#2FBF9B] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(47,191,155,0.22)] transition hover:bg-[#16876F]"
+            className="h-10 flex-1 min-w-[128px] whitespace-nowrap rounded-2xl bg-[#2FBF9B] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(47,191,155,0.22)] transition hover:bg-[#16876F] sm:flex-none"
           >
             {copied ? "已复制全部结果" : "复制全部结果"}
           </button>
           <button
             type="button"
-            onClick={onRegenerate}
+            onClick={handleRegenerateClick}
             disabled={isRegenerating}
-            className="h-10 rounded-2xl border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F] disabled:cursor-not-allowed disabled:text-[#94A3B8]"
+            className="h-10 flex-1 min-w-[128px] whitespace-nowrap rounded-2xl border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F] disabled:cursor-not-allowed disabled:text-[#94A3B8] sm:flex-none"
           >
             {isRegenerating ? "重新生成中..." : "重新生成一次"}
           </button>
@@ -213,18 +277,31 @@ export default function ResultPanel({
       {visibleQuality ? <QualityReference analysis={visibleQuality} /> : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <SummaryBadge label="简历表达" value={`${result.conservativeVersion.length + result.enhancedVersion.length} 条`} />
+        <SummaryBadge label="推荐简历版本" value={`${recommendedVersion.length} 条`} />
         <SummaryBadge label="面试追问" value={`${result.interviewQuestions.length} 个`} />
         <SummaryBadge label="修改建议" value={`${result.suggestions.length} 条`} />
       </div>
 
       <div className="mt-5 space-y-5">
-        <Section title="保守版项目经历">
-          <ResultList items={result.conservativeVersion} />
-        </Section>
-        <Section title="岗位强化版项目经历">
-          <ResultList items={result.enhancedVersion} />
-        </Section>
+        <RecommendedResumeSection
+          items={recommendedVersion}
+          copiedSection={copiedSection}
+          onCopySection={handleCopySection}
+        />
+        <EditableVersionSection
+          title="保守真实版（参考）"
+          items={result.conservativeVersion}
+          copiedSection={copiedSection}
+          onCopySection={handleCopySection}
+          onSave={(items) => handleResultPatch({ conservativeVersion: items })}
+        />
+        <EditableVersionSection
+          title="岗位强化版（参考）"
+          items={result.enhancedVersion}
+          copiedSection={copiedSection}
+          onCopySection={handleCopySection}
+          onSave={(items) => handleResultPatch({ enhancedVersion: items })}
+        />
         <Section title="5 个面试追问">
           <ol className="space-y-3">
             {result.interviewQuestions.map((item, index) => (
@@ -394,6 +471,141 @@ function FeedbackForm({
       </div>
       {error ? <p className="mt-3 text-sm text-[#64748B]">{error}</p> : null}
     </form>
+  );
+}
+
+function RecommendedResumeSection({
+  items,
+  copiedSection,
+  onCopySection,
+}: {
+  items: string[];
+  copiedSection: string;
+  onCopySection: (title: string, items: string[]) => void;
+}) {
+  const title = "推荐放入简历的项目经历";
+
+  return (
+    <section className="rounded-2xl border border-[#CFF5EA] bg-[#F0FBF7] p-5 shadow-[0_12px_30px_rgba(47,191,155,0.10)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-[#16876F]">
+            推荐版本
+          </span>
+          <h3 className="mt-3 text-lg font-bold text-[#1F2933]">
+            可以优先复制到简历里的项目经历
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[#64748B]">
+            这部分已经把你的项目信息整合成更接近简历成稿的表达，建议先从这里开始修改。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onCopySection(title, items)}
+          className="h-10 w-full min-w-[148px] whitespace-nowrap rounded-2xl bg-[#2FBF9B] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(47,191,155,0.22)] transition hover:bg-[#16876F] sm:w-auto"
+        >
+          {copiedSection === title ? "已复制推荐版本" : "复制推荐版本"}
+        </button>
+      </div>
+      <ol className="mt-4 space-y-3">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="rounded-2xl bg-white p-4 text-sm leading-7 text-[#1F2933]">
+            <span className="mr-2 font-bold text-[#16876F]">{index + 1}.</span>
+            {item}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function EditableVersionSection({
+  title,
+  items,
+  copiedSection,
+  onCopySection,
+  onSave,
+}: {
+  title: string;
+  items: string[];
+  copiedSection: string;
+  onCopySection: (title: string, items: string[]) => void;
+  onSave: (items: string[]) => void;
+}) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+
+  function startEditing(index: number) {
+    setEditingIndex(index);
+    setDraft(items[index] || "");
+  }
+
+  function saveEditing() {
+    if (editingIndex === null) return;
+
+    const nextItems = items.map((item, index) =>
+      index === editingIndex ? draft.trim() || item : item,
+    );
+    onSave(nextItems);
+    setEditingIndex(null);
+    setDraft("");
+  }
+
+  return (
+    <Section title={title}>
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onCopySection(title, items)}
+          className="h-9 rounded-2xl border border-[#E5E7EB] bg-white px-3 text-xs font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F]"
+        >
+          {copiedSection === title ? "已复制本段" : "复制本段"}
+        </button>
+      </div>
+      <ol className="space-y-3">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="rounded-2xl border border-[#E5E7EB] bg-[#F7FAF8] p-4">
+            {editingIndex === index ? (
+              <div>
+                <textarea
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  rows={5}
+                  className="w-full resize-y rounded-2xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm leading-6 text-[#1F2933] outline-none transition focus:border-[#2FBF9B] focus:ring-2 focus:ring-[#2FBF9B]/20"
+                />
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={saveEditing}
+                    className="h-9 rounded-2xl bg-[#2FBF9B] px-4 text-sm font-semibold text-white transition hover:bg-[#16876F]"
+                  >
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingIndex(null)}
+                    className="h-9 rounded-2xl border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F]"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p>{item}</p>
+                <button
+                  type="button"
+                  onClick={() => startEditing(index)}
+                  className="mt-3 text-xs font-semibold text-[#16876F] hover:text-[#1F2933]"
+                >
+                  编辑
+                </button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    </Section>
   );
 }
 

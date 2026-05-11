@@ -4,6 +4,7 @@ export const careerResultJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: [
+    "recommendedResumeVersion",
     "conservativeVersion",
     "enhancedVersion",
     "interviewQuestions",
@@ -11,6 +12,10 @@ export const careerResultJsonSchema = {
     "suggestions",
   ],
   properties: {
+    recommendedResumeVersion: {
+      type: "array",
+      items: { type: "string" },
+    },
     conservativeVersion: {
       type: "array",
       items: { type: "string" },
@@ -74,6 +79,7 @@ export function buildCareerGenerationPrompt(data: CareerFormData) {
 目标岗位 JD：${data.jobDescription || "未填写"}
 
 字段含义：
+- recommendedResumeVersion：推荐直接放入简历的最终版本。优先输出 2-3 条简历 bullet，语言要像正式简历，可直接复制使用；如果信息不足，仍要基于真实信息写得克制。
 - conservativeVersion：保守真实版项目经历，适合直接放入简历，重视真实和可证明。
 - enhancedVersion：岗位强化版项目经历，在不编造事实的前提下更突出目标岗位相关能力。
 - interviewQuestions：5 个面试官可能追问的问题，每个问题必须包含回答思路。

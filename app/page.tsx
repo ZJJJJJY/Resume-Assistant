@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { appVersion } from "@/lib/constants";
 
 const valueCards = [
   {
@@ -21,9 +22,14 @@ export default function HomePage() {
       <section className="mx-auto flex min-h-screen max-w-[1120px] flex-col justify-center px-5 py-10 sm:px-6">
         <div className="rounded-2xl border border-[#E5E7EB] bg-white p-6 shadow-[0_18px_60px_rgba(31,41,51,0.08)] sm:p-8 lg:p-10">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold text-[#16876F]">
-              Career Material Assistant
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-[#16876F]">
+                Career Material Assistant
+              </p>
+              <span className="rounded-full bg-[#E8F8F3] px-3 py-1 text-xs font-bold text-[#16876F]">
+                {appVersion} 试用版
+              </span>
+            </div>
             <h1 className="mt-5 text-4xl font-bold leading-tight tracking-normal text-[#1F2933] sm:text-5xl">
               把课程项目整理成能投递的简历项目经历
             </h1>
@@ -44,6 +50,12 @@ export default function HomePage() {
               >
                 了解能做什么
               </a>
+              <Link
+                href="/history"
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white px-7 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F]"
+              >
+                查看历史记录
+              </Link>
             </div>
 
             <p className="mt-5 rounded-2xl border border-[#E5E7EB] bg-[#F7FAF8] px-4 py-3 text-sm leading-6 text-[#64748B]">
