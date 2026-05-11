@@ -320,30 +320,39 @@ export default function FormPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f8f6] px-4 py-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+    <main className="min-h-screen bg-[#F7FAF8] px-4 py-8 text-[#1F2933]">
+      <div className="mx-auto max-w-[1120px]">
+        <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-[0_14px_42px_rgba(31,41,51,0.06)] md:p-6">
           <div>
-            <a href="/" className="text-sm font-semibold text-mint hover:text-ink">
+            <a href="/" className="text-sm font-semibold text-[#16876F] transition hover:text-[#1F2933]">
               返回首页
             </a>
-            <h1 className="mt-4 text-3xl font-bold text-ink">填写项目信息</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              不需要写得很完美，先把真实信息填进去。生成结果会给你一个可修改的初稿。
-            </p>
+            <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64748B]">
+                  Career Material Assistant
+                </p>
+                <h1 className="mt-2 text-3xl font-bold text-[#1F2933]">填写项目信息</h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B]">
+                  不需要写得很完美，先把真实信息填进去。系统会帮你整理成简历表达、面试追问和修改建议。
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fillSampleProject}
+                disabled={isLoading}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#2FBF9B] bg-white px-4 text-sm font-semibold text-[#16876F] transition hover:bg-[#2FBF9B] hover:text-white disabled:cursor-not-allowed disabled:border-[#E5E7EB] disabled:text-[#94A3B8]"
+              >
+                填入示例项目
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={fillSampleProject}
-            disabled={isLoading}
-            className="inline-flex h-11 items-center justify-center rounded-md border border-mint px-4 text-sm font-semibold text-mint transition hover:bg-mint hover:text-white disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
-          >
-            填入示例项目
-          </button>
+          <StepStrip />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        <div className="grid items-start gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <form onSubmit={handleSubmit} className="space-y-5">
             {fieldGroups.map((group) => (
               <FormSection key={group.id} group={group}>
@@ -367,15 +376,15 @@ export default function FormPage() {
             ) : null}
 
             {qualityWarning ? (
-              <p className="rounded-md border border-lemon/60 bg-[#fff9e8] px-3 py-2 text-sm leading-6 text-ink">
+              <p className="rounded-2xl border border-[#FED7AA] bg-[#FFF7ED] px-4 py-3 text-sm leading-6 text-[#1F2933]">
                 {qualityWarning}
                 {qualityAnalysis ? ` 当前信息完整度：${getCompletenessLabel(qualityAnalysis.completenessLevel)}。` : ""}
               </p>
             ) : null}
 
             {isLoading ? (
-              <div className="rounded-md border border-mint/40 bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-mint align-middle" />{" "}
+              <div className="rounded-2xl border border-[#BBF7D0] bg-white px-4 py-3 text-sm font-semibold text-[#1F2933] shadow-[0_10px_24px_rgba(47,191,155,0.12)]">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#2FBF9B] align-middle" />{" "}
                 {loadingText}
               </div>
             ) : null}
@@ -384,13 +393,13 @@ export default function FormPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-md bg-[#1f9d8b] px-7 text-base font-bold text-white shadow-lg shadow-mint/35 ring-2 ring-[#17202a]/10 transition hover:bg-[#188a7a] hover:shadow-xl hover:shadow-mint/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:bg-slate-400 disabled:shadow-none disabled:ring-0"
+                className="inline-flex h-[56px] min-h-[56px] w-full items-center justify-center rounded-2xl bg-[#2FBF9B] px-7 text-base font-bold text-white shadow-[0_18px_36px_rgba(47,191,155,0.28)] transition hover:bg-[#16876F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#16876F] disabled:cursor-not-allowed disabled:bg-[#94A3B8] disabled:shadow-none"
               >
                 {isLoading ? loadingText : "生成求职材料"}
               </button>
             </div>
 
-            <p className="text-xs leading-5 text-slate-500">
+            <p className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-xs leading-5 text-[#64748B]">
               请勿填写身份证号、手机号、银行卡号等敏感信息。生成内容仅供参考，最终简历请以真实经历为准。
             </p>
           </form>
@@ -431,10 +440,16 @@ function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={group.id} className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+    <section
+      id={group.id}
+      className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-[0_12px_34px_rgba(31,41,51,0.05)]"
+    >
       <div className="mb-5">
-        <h2 className="text-lg font-semibold text-ink">{group.title}</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{group.description}</p>
+        <div className="flex items-center gap-3">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#2FBF9B]" />
+          <h2 className="text-lg font-semibold text-[#1F2933]">{group.title}</h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-[#64748B]">{group.description}</p>
       </div>
       {children}
     </section>
@@ -454,17 +469,17 @@ function FormField({
   disabled: boolean;
   onChange: (name: keyof CareerFormData, value: string) => void;
 }) {
-  const sharedClassName = `mt-2 w-full rounded-md border px-3 text-sm outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 ${
+  const sharedClassName = `mt-2 w-full rounded-2xl border px-3 text-sm outline-none transition placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 ${
     error
-      ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
-      : "border-slate-300 focus:border-mint focus:ring-2 focus:ring-mint/20"
+      ? "border-[#FDBA74] bg-[#FFF7ED] focus:border-[#D97706] focus:ring-2 focus:ring-[#FED7AA]"
+      : "border-[#E5E7EB] bg-white hover:border-[#CBD5E1] focus:border-[#2FBF9B] focus:bg-white focus:ring-2 focus:ring-[#2FBF9B]/20"
   }`;
 
   return (
     <label className={field.multiline ? "sm:col-span-2" : undefined}>
-      <span className="text-sm font-semibold text-ink">
+      <span className="text-sm font-semibold text-[#1F2933]">
         {field.label}
-        {field.required ? <span className="ml-1 text-red-500">*</span> : null}
+        {field.required ? <span className="ml-1 text-[#D97706]">*</span> : null}
       </span>
       {field.multiline ? (
         <textarea
@@ -484,7 +499,24 @@ function FormField({
           className={`${sharedClassName} h-11`}
         />
       )}
-      {error ? <p className="mt-1 text-xs leading-5 text-red-600">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs leading-5 text-[#D97706]">{error}</p> : null}
     </label>
+  );
+}
+
+function StepStrip() {
+  const steps = ["基本信息", "项目经历", "目标岗位"];
+
+  return (
+    <div className="mt-6 grid gap-3 border-t border-[#E5E7EB] pt-5 sm:grid-cols-3">
+      {steps.map((step, index) => (
+        <div key={step} className="flex items-center gap-3 rounded-2xl bg-[#F7FAF8] px-3 py-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E8F8F3] text-xs font-bold text-[#16876F]">
+            {index + 1}
+          </span>
+          <span className="text-sm font-semibold text-[#1F2933]">{step}</span>
+        </div>
+      ))}
+    </div>
   );
 }
