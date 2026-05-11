@@ -19,3 +19,11 @@ export type GenerateResult = {
   interviewQuestions: string[];
   riskTips: string[];
 };
+
+export type FeedbackRating = "有帮助" | "一般" | "没帮助";
+
+export type ResultFeedback = {
+  rating: FeedbackRating;
+  comment: string;
+  createdAt: string;
+};
