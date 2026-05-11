@@ -28,6 +28,7 @@ export function isGenerateResult(value: unknown): value is GenerateResult {
         item.answerGuide.trim().length > 0,
     ) &&
     isStringArray(result.riskWarnings, 1) &&
-    isStringArray(result.suggestions, 1)
+    isStringArray(result.suggestions, 1) &&
+    (!result.source || result.source === "ai" || result.source === "mock")
   );
 }

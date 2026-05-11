@@ -22,6 +22,8 @@ export type GenerateResult = {
   }>;
   riskWarnings: string[];
   suggestions: string[];
+  source?: "ai" | "mock";
+  fallbackReason?: string;
 };
 
 export type FeedbackRating = "有帮助" | "一般" | "没帮助";
@@ -30,4 +32,12 @@ export type ResultFeedback = {
   rating: FeedbackRating;
   comment: string;
   createdAt: string;
+  targetRole?: string;
+  projectName?: string;
+};
+
+export type InputQualityAnalysis = {
+  completenessLevel: "high" | "medium" | "low";
+  issues: string[];
+  suggestions: string[];
 };

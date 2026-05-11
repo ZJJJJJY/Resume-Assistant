@@ -1,7 +1,9 @@
 import type { CareerFormData, GenerateResult } from "@/lib/types";
 
-export function generateMockResult(data: CareerFormData): GenerateResult {
+export function generateMockResult(data: CareerFormData, fallbackReason?: string): GenerateResult {
   return {
+    source: "mock",
+    fallbackReason,
     conservativeVersion: [
       `在「${data.projectName || "项目"}」中，围绕${
         data.projectBackground || "业务需求"

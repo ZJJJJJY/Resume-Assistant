@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ResultPanel from "@/components/ResultPanel";
-import type { CareerFormData, GenerateResult } from "@/lib/types";
+import { analyzeInputQuality, getCompletenessLabel } from "@/lib/analyzeInputQuality";
+import type { CareerFormData, GenerateResult, InputQualityAnalysis } from "@/lib/types";
 
 type FieldConfig = {
   name: keyof CareerFormData;
@@ -70,6 +71,8 @@ const loadingMessages = [
   "正在生成简历表达...",
   "正在准备面试追问...",
 ];
+
+const savedFormStorageKey = "career-material-latest-form";
 
 const fieldGroups: FieldGroup[] = [
   {
@@ -162,6 +165,9 @@ export default function FormPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [loadingIndex, setLoadingIndex] = useState(0);
+  const [qualityAnalysis, setQualityAnalysis] = useState<InputQualityAnalysis | null>(null);
+  const [qualityWarning, setQualityWarning] = useState("");
+  const [regenerateError, setRegenerateError] = useState("");
 
   const loadingText = useMemo(
     () => loadingMessages[loadingIndex % loadingMessages.length],
@@ -213,11 +219,21 @@ export default function FormPage() {
     setForm(sampleForm);
     setFieldErrors({});
     setError("");
+    setQualityWarning("");
+    setRegenerateError("");
     setResult(null);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const currentQuality = analyzeInputQuality(form);
+    setQualityAnalysis(currentQuality);
+    setQualityWarning(
+      currentQuality.completenessLevel === "low"
+        ? "当前输入完整度较低，生成结果可能偏泛。你可以继续生成，也可以先补充更多细节。"
+        : "",
+    );
 
     const nextErrors = validateForm(form);
     setFieldErrors(nextErrors);
@@ -227,8 +243,10 @@ export default function FormPage() {
       return;
     }
 
+    saveLatestForm(form);
     setIsLoading(true);
     setError("");
+    setRegenerateError("");
     setResult(null);
 
     try {
@@ -251,6 +269,51 @@ export default function FormPage() {
       setResult(data);
     } catch (currentError) {
       setError(currentError instanceof Error ? currentError.message : "生成失败，请稍后重试。");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    const latestForm = readLatestForm();
+
+    if (!latestForm) {
+      setRegenerateError("没有找到上一次填写的表单，请先在左侧填写并生成一次。");
+      return;
+    }
+
+    const currentQuality = analyzeInputQuality(latestForm);
+    setQualityAnalysis(currentQuality);
+    setQualityWarning(
+      currentQuality.completenessLevel === "low"
+        ? "当前输入完整度较低，重新生成结果可能仍然偏泛。建议补充细节后再试。"
+        : "",
+    );
+    setForm(latestForm);
+    setIsLoading(true);
+    setError("");
+    setRegenerateError("");
+
+    try {
+      const responsePromise = fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(latestForm),
+      });
+      const minimumLoadingPromise = new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 900);
+      });
+
+      const [response] = await Promise.all([responsePromise, minimumLoadingPromise]);
+
+      if (!response.ok) {
+        throw new Error("重新生成失败，请稍后重试。");
+      }
+
+      const data = (await response.json()) as GenerateResult;
+      setResult(data);
+    } catch {
+      setRegenerateError("重新生成失败，请稍后重试。");
     } finally {
       setIsLoading(false);
     }
@@ -303,6 +366,13 @@ export default function FormPage() {
               <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
             ) : null}
 
+            {qualityWarning ? (
+              <p className="rounded-md border border-lemon/60 bg-[#fff9e8] px-3 py-2 text-sm leading-6 text-ink">
+                {qualityWarning}
+                {qualityAnalysis ? ` 当前信息完整度：${getCompletenessLabel(qualityAnalysis.completenessLevel)}。` : ""}
+              </p>
+            ) : null}
+
             {isLoading ? (
               <div className="rounded-md border border-mint/40 bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm">
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-mint align-middle" />{" "}
@@ -319,13 +389,38 @@ export default function FormPage() {
                 {isLoading ? loadingText : "生成求职材料"}
               </button>
             </div>
+
+            <p className="text-xs leading-5 text-slate-500">
+              请勿填写身份证号、手机号、银行卡号等敏感信息。生成内容仅供参考，最终简历请以真实经历为准。
+            </p>
           </form>
 
-          <ResultPanel result={result} />
+          <ResultPanel
+            result={result}
+            qualityAnalysis={qualityAnalysis}
+            onRegenerate={handleRegenerate}
+            isRegenerating={isLoading}
+            regenerateError={regenerateError}
+          />
         </div>
       </div>
     </main>
   );
+}
+
+function saveLatestForm(currentForm: CareerFormData) {
+  window.localStorage.setItem(savedFormStorageKey, JSON.stringify(currentForm));
+}
+
+function readLatestForm() {
+  const storedForm = window.localStorage.getItem(savedFormStorageKey);
+  if (!storedForm) return null;
+
+  try {
+    return JSON.parse(storedForm) as CareerFormData;
+  } catch {
+    return null;
+  }
 }
 
 function FormSection({
