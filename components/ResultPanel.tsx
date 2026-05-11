@@ -21,16 +21,21 @@ export default function ResultPanel({ result }: ResultPanelProps) {
 
     return [
       "保守版项目经历",
-      result.conservativeExperience,
+      ...result.conservativeVersion.map((item, index) => `${index + 1}. ${item}`),
       "",
       "岗位强化版项目经历",
-      result.roleFocusedExperience,
+      ...result.enhancedVersion.map((item, index) => `${index + 1}. ${item}`),
       "",
       "面试追问",
-      ...result.interviewQuestions.map((item, index) => `${index + 1}. ${item}`),
+      ...result.interviewQuestions.map(
+        (item, index) => `${index + 1}. ${item.question}\n回答思路：${item.answerGuide}`,
+      ),
       "",
       "简历真实性风险提示",
-      ...result.riskTips.map((item, index) => `${index + 1}. ${item}`),
+      ...result.riskWarnings.map((item, index) => `${index + 1}. ${item}`),
+      "",
+      "下一步修改建议",
+      ...result.suggestions.map((item, index) => `${index + 1}. ${item}`),
     ].join("\n");
   }, [result]);
 
@@ -95,24 +100,26 @@ export default function ResultPanel({ result }: ResultPanelProps) {
 
       <div className="mt-5 space-y-5">
         <Section title="保守版项目经历">
-          <p>{result.conservativeExperience}</p>
+          <ResultList items={result.conservativeVersion} />
         </Section>
         <Section title="岗位强化版项目经历">
-          <p>{result.roleFocusedExperience}</p>
+          <ResultList items={result.enhancedVersion} />
         </Section>
         <Section title="5 个面试追问">
           <ol className="list-decimal space-y-2 pl-5">
-            {result.interviewQuestions.map((question) => (
-              <li key={question}>{question}</li>
+            {result.interviewQuestions.map((item) => (
+              <li key={item.question}>
+                <p className="font-semibold text-ink">{item.question}</p>
+                <p className="mt-1 text-slate-600">回答思路：{item.answerGuide}</p>
+              </li>
             ))}
           </ol>
         </Section>
         <Section title="简历真实性风险提示">
-          <ol className="list-decimal space-y-2 pl-5">
-            {result.riskTips.map((tip) => (
-              <li key={tip}>{tip}</li>
-            ))}
-          </ol>
+          <ResultList items={result.riskWarnings} />
+        </Section>
+        <Section title="下一步修改建议">
+          <ResultList items={result.suggestions} />
         </Section>
       </div>
 
@@ -209,5 +216,15 @@ function Section({
       <h3 className="mb-2 text-sm font-semibold text-mint">{title}</h3>
       <div className="text-sm leading-7 text-slate-700">{children}</div>
     </section>
+  );
+}
+
+function ResultList({ items }: { items: string[] }) {
+  return (
+    <ol className="list-decimal space-y-2 pl-5">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ol>
   );
 }

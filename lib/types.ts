@@ -14,10 +14,14 @@ export type CareerFormData = {
 };
 
 export type GenerateResult = {
-  conservativeExperience: string;
-  roleFocusedExperience: string;
-  interviewQuestions: string[];
-  riskTips: string[];
+  conservativeVersion: string[];
+  enhancedVersion: string[];
+  interviewQuestions: Array<{
+    question: string;
+    answerGuide: string;
+  }>;
+  riskWarnings: string[];
+  suggestions: string[];
 };
 
 export type FeedbackRating = "有帮助" | "一般" | "没帮助";
