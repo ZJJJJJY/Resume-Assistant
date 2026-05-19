@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { appVersion } from "@/lib/constants";
+import { appVersion, feedbackStorageKey } from "@/lib/constants";
 import {
   deleteTrialHistoryItem,
   readTrialHistory,
   saveLatestForm,
 } from "@/lib/trialHistory";
-import { recordTrialEvent } from "@/lib/trialEvents";
-import type { TrialHistoryItem } from "@/lib/types";
+import { readTrialEvents, recordTrialEvent } from "@/lib/trialEvents";
+import type { ResultFeedback, TrialEvent, TrialHistoryItem } from "@/lib/types";
 
 const completenessLabels = {
   high: "高",
@@ -49,10 +49,78 @@ function buildCopyText(item: TrialHistoryItem) {
   ].join("\n");
 }
 
+function readSavedFeedback() {
+  const storedFeedback = window.localStorage.getItem(feedbackStorageKey);
+  if (!storedFeedback) return [];
+
+  try {
+    return JSON.parse(storedFeedback) as ResultFeedback[];
+  } catch {
+    return [];
+  }
+}
+
+function countBy<T extends string>(values: T[]) {
+  return values.reduce(
+    (summary, value) => ({
+      ...summary,
+      [value]: (summary[value] || 0) + 1,
+    }),
+    {} as Record<T, number>,
+  );
+}
+
+function buildTrialDataPackage(items: TrialHistoryItem[], events: TrialEvent[]) {
+  const feedback = readSavedFeedback();
+  const sourceSummary = countBy(items.map((item) => item.source));
+  const completenessSummary = countBy(items.map((item) => item.completenessLevel));
+  const eventSummary = countBy(events.map((event) => event.eventName));
+
+  return [
+    "求职材料生成助手试用数据包",
+    `当前版本：${appVersion}`,
+    `导出时间：${new Date().toLocaleString("zh-CN")}`,
+    "",
+    "概览",
+    `历史记录数：${items.length}`,
+    `反馈条数：${feedback.length}`,
+    `试用事件数：${events.length}`,
+    `生成来源统计：AI ${sourceSummary.ai || 0} 次 / Mock ${sourceSummary.mock || 0} 次`,
+    `完整度统计：高 ${completenessSummary.high || 0} 次 / 中 ${completenessSummary.medium || 0} 次 / 低 ${completenessSummary.low || 0} 次`,
+    "",
+    "事件统计",
+    ...Object.entries(eventSummary).map(([eventName, count]) => `${eventName}：${count}`),
+    "",
+    "最近历史记录",
+    ...items.slice(0, 10).map((item, index) =>
+      [
+        `${index + 1}. ${item.formData.projectName || "未命名项目"}`,
+        `目标岗位：${item.formData.targetRole || "未填写"}`,
+        `项目类型：${item.formData.projectType || "未填写"}`,
+        `生成时间：${formatDate(item.createdAt)}`,
+        `来源：${item.source}`,
+        `完整度：${item.completenessLevel}`,
+      ].join("\n"),
+    ),
+    "",
+    "最近反馈",
+    ...feedback.slice(-10).map((item, index) =>
+      [
+        `${index + 1}. ${item.rating}`,
+        `项目：${item.projectName || "未填写"}`,
+        `目标岗位：${item.targetRole || "未填写"}`,
+        `反馈：${item.comment || "未填写"}`,
+        `时间：${formatDate(item.createdAt)}`,
+      ].join("\n"),
+    ),
+  ].join("\n");
+}
+
 export default function HistoryPage() {
   const [items, setItems] = useState<TrialHistoryItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [copiedId, setCopiedId] = useState("");
+  const [trialDataCopied, setTrialDataCopied] = useState(false);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedId) || null,
@@ -90,6 +158,12 @@ export default function HistoryPage() {
     window.location.href = "/form?fromHistory=1";
   }
 
+  async function copyTrialDataPackage() {
+    await navigator.clipboard.writeText(buildTrialDataPackage(items, readTrialEvents()));
+    setTrialDataCopied(true);
+    window.setTimeout(() => setTrialDataCopied(false), 1600);
+  }
+
   return (
     <main className="min-h-screen bg-[#F7FAF8] px-4 py-8 text-[#1F2933]">
       <div className="mx-auto max-w-[1120px]">
@@ -112,12 +186,21 @@ export default function HistoryPage() {
                 查看每次生成的表单、结果和来源，适合对比不同版本，也方便继续修改。
               </p>
             </div>
-            <Link
-              href="/form"
-              className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#2FBF9B] px-5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(47,191,155,0.24)] transition hover:bg-[#16876F]"
-            >
-              新建一次生成
-            </Link>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={copyTrialDataPackage}
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-2xl border border-[#E5E7EB] bg-white px-5 text-sm font-semibold text-[#1F2933] transition hover:border-[#2FBF9B] hover:text-[#16876F]"
+              >
+                {trialDataCopied ? "已复制试用数据包" : "复制试用数据包"}
+              </button>
+              <Link
+                href="/form"
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-2xl bg-[#2FBF9B] px-5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(47,191,155,0.24)] transition hover:bg-[#16876F]"
+              >
+                新建一次生成
+              </Link>
+            </div>
           </div>
         </header>
 

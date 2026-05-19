@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { analyzeInputQuality, getCompletenessLabel } from "@/lib/analyzeInputQuality";
-import { appVersion } from "@/lib/constants";
+import { appVersion, feedbackStorageKey } from "@/lib/constants";
 import { recordTrialEvent } from "@/lib/trialEvents";
 import type {
   CareerFormData,
@@ -24,7 +24,6 @@ type ResultPanelProps = {
 };
 
 const feedbackOptions: FeedbackRating[] = ["有帮助", "一般", "没帮助"];
-const feedbackStorageKey = "career-material-feedback";
 const savedFormStorageKey = "career-material-latest-form";
 
 export default function ResultPanel({
